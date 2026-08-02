@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface AuthFormProps {
   mode?: "login" | "signup";
@@ -9,16 +9,22 @@ interface AuthFormProps {
 
 export function AuthForm({ mode = "login" }: AuthFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLogin, setIsLogin] = useState(mode === "login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const nextParam = searchParams.get("next");
+  const destination = nextParam && nextParam.startsWith("/") ? nextParam : "/today";
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
+    setNotice("");
     setSubmitting(true);
 
     try {
@@ -34,8 +40,16 @@ export function AuthForm({ mode = "login" }: AuthFormProps) {
         throw new Error(data.message || "Authentication failed");
       }
 
+      // Signup with email confirmation on: no session yet, so don't navigate.
+      if (!isLogin && data.needsConfirmation) {
+        setNotice(data.message || "Check your inbox to confirm your email, then sign in.");
+        setIsLogin(true);
+        setPassword("");
+        return;
+      }
+
       router.refresh();
-      router.replace("/today");
+      router.replace(destination);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
@@ -57,6 +71,7 @@ export function AuthForm({ mode = "login" }: AuthFormProps) {
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
+            autoComplete="name"
             className="w-full rounded-full border border-white/10 bg-black/25 px-4 py-3 text-white outline-none"
             placeholder="Your name"
           />
@@ -67,8 +82,10 @@ export function AuthForm({ mode = "login" }: AuthFormProps) {
         <span className="mb-1 block">Email</span>
         <input
           type="email"
+          required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
+          autoComplete="email"
           className="w-full rounded-full border border-white/10 bg-black/25 px-4 py-3 text-white outline-none"
           placeholder="you@example.com"
         />
@@ -78,14 +95,18 @@ export function AuthForm({ mode = "login" }: AuthFormProps) {
         <span className="mb-1 block">Password</span>
         <input
           type="password"
+          required
+          minLength={6}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
+          autoComplete={isLogin ? "current-password" : "new-password"}
           className="w-full rounded-full border border-white/10 bg-black/25 px-4 py-3 text-white outline-none"
           placeholder="At least 6 characters"
         />
       </label>
 
       {error ? <p className="mb-4 text-sm text-rose-300">{error}</p> : null}
+      {notice ? <p className="mb-4 text-sm text-emerald-300">{notice}</p> : null}
 
       <button
         type="submit"
@@ -98,16 +119,16 @@ export function AuthForm({ mode = "login" }: AuthFormProps) {
       <div className="mt-4 flex flex-col gap-2 text-sm text-white/60">
         <button
           type="button"
-          onClick={() => setIsLogin((value) => !value)}
+          onClick={() => {
+            setIsLogin((value) => !value);
+            setError("");
+            setNotice("");
+          }}
           className="underline"
         >
           {isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
         </button>
-        <button
-          type="button"
-          onClick={() => router.push("/")}
-          className="self-start underline"
-        >
+        <button type="button" onClick={() => router.push("/")} className="self-start underline">
           ← Back to landing page
         </button>
       </div>

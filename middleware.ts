@@ -1,28 +1,34 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getSessionFromRequest } from "@/lib/auth";
+import { getUserFromRequest } from "@/lib/auth";
 
 const protectedPaths = ["/today", "/study-log", "/planner", "/question-practice", "/dashboard"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/api/auth") || pathname === "/auth") {
-    return NextResponse.next();
+  // Auth API routes must be able to set cookies themselves.
+  if (pathname.startsWith("/api/auth")) return NextResponse.next();
+
+  // IMPORTANT: this response object is what carries refreshed auth cookies.
+  const response = NextResponse.next({ request });
+  const user = await getUserFromRequest(request, response);
+
+  const isProtected = protectedPaths.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
+
+  if (isProtected && !user) {
+    const url = new URL("/auth", request.url);
+    url.searchParams.set("next", pathname);
+    return NextResponse.redirect(url);
   }
 
-  if (protectedPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
-    try {
-      const session = await getSessionFromRequest(request);
-      if (!session) {
-        return NextResponse.redirect(new URL("/auth", request.url));
-      }
-    } catch {
-      return NextResponse.redirect(new URL("/auth", request.url));
-    }
+  if (pathname === "/auth" && user) {
+    return NextResponse.redirect(new URL("/today", request.url));
   }
 
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {

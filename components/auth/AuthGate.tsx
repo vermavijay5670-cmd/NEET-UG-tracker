@@ -29,7 +29,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       }
       setUser(null);
       setStatus("guest");
-      router.replace("/");
+      router.replace("/auth");
     }
 
     checkAuth();

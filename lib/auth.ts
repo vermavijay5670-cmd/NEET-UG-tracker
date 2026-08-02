@@ -1,6 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import type { NextRequest } from "next/server";
+import type { NextRequest, NextResponse } from "next/server";
 
 export interface AuthUser {
   id: string;
@@ -14,25 +14,21 @@ function getEnv(name: string) {
     process.env[name],
     process.env[`NEXT_PUBLIC_${name}`],
     name === "SUPABASE_PUBLISHABLE_KEY" ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : undefined,
-    name === "SUPABASE_SECRET_KEY" ? process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY : undefined,
+    name === "SUPABASE_SECRET_KEY" ? process.env.SUPABASE_SERVICE_ROLE_KEY : undefined,
     name === "SUPABASE_URL" ? process.env.NEXT_PUBLIC_SUPABASE_URL : undefined,
   ];
 
   for (const value of candidates) {
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
-    }
+    if (typeof value === "string" && value.trim()) return value.trim();
   }
-
   return "";
 }
 
-function createSupabaseCookieOptions(): CookieOptions {
+export function getAuthCookieOptions(): CookieOptions {
   return {
     path: "/",
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    httpOnly: true,
   };
 }
 
@@ -46,9 +42,11 @@ export async function createSupabaseServerClient() {
       },
       setAll(cookiesToSet) {
         try {
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, { ...getAuthCookieOptions(), ...options }),
+          );
         } catch {
-          // Ignore if called during a request that is not allowed to write cookies.
+          // Called from a Server Component render — cookies are read-only there.
         }
       },
     },
@@ -62,22 +60,34 @@ export async function createSupabaseAdminClient() {
   });
 }
 
+function toAuthUser(user: {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+  created_at?: string;
+}): AuthUser {
+  return {
+    id: user.id,
+    email: user.email || "",
+    name: (user.user_metadata?.full_name as string) || "",
+    createdAt: user.created_at || new Date().toISOString(),
+  };
+}
+
 export async function signInWithEmailPassword(email: string, password: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error || !data.session) {
-    throw new Error(error?.message || "Invalid email or password");
-  }
 
-  return {
-    user: {
-      id: data.user.id,
-      email: data.user.email || email,
-      name: data.user.user_metadata?.full_name || "",
-      createdAt: data.user.created_at || new Date().toISOString(),
-    },
-    session: data.session,
-  };
+  if (error) {
+    // Surface the real cause instead of a generic failure.
+    if (error.message.toLowerCase().includes("not confirmed")) {
+      throw new Error("Your email isn't confirmed yet. Check your inbox for the confirmation link.");
+    }
+    throw new Error(error.message);
+  }
+  if (!data.session || !data.user) throw new Error("Invalid email or password");
+
+  return { user: toAuthUser(data.user), session: data.session };
 }
 
 export async function signUpWithEmailPassword(email: string, password: string, name?: string) {
@@ -85,84 +95,57 @@ export async function signUpWithEmailPassword(email: string, password: string, n
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: {
-      data: { full_name: name || "" },
-    },
+    options: { data: { full_name: name || "" } },
   });
 
-  if (error) {
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
+  if (!data.user) throw new Error("Sign-up failed. Please try again.");
 
-  if (!data.session || !data.user) {
-    throw new Error("Please check your inbox to confirm the sign-up.");
-  }
-
+  // No session => email confirmation is enabled. This is a SUCCESS, not an error.
   return {
-    user: {
-      id: data.user.id,
-      email: data.user.email || email,
-      name: data.user.user_metadata?.full_name || name || "",
-      createdAt: data.user.created_at || new Date().toISOString(),
-    },
+    user: toAuthUser(data.user),
     session: data.session,
+    needsConfirmation: !data.session,
   };
 }
 
 export async function signOutServer() {
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signOut();
-  if (error) {
-    throw error;
-  }
+  await supabase.auth.signOut();
 }
 
-export async function getAuthenticatedUser() {
+export async function getAuthenticatedUser(): Promise<AuthUser | null> {
   const supabase = await createSupabaseServerClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) {
-    return null;
-  }
-
-  return {
-    id: user.id,
-    email: user.email || "",
-    name: user.user_metadata?.full_name || "",
-    createdAt: user.created_at || new Date().toISOString(),
-  };
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) return null;
+  return toAuthUser(data.user);
 }
 
-export async function getSessionFromRequest(request: NextRequest) {
-  const cookieStore = request.cookies;
+/**
+ * Middleware-safe session check. Unlike the old version this uses getUser()
+ * (which revalidates and refreshes) and writes rotated cookies onto the
+ * outgoing response, so long-lived sessions no longer get bounced to /auth.
+ */
+export async function getUserFromRequest(request: NextRequest, response: NextResponse) {
   const supabase = createServerClient(getEnv("SUPABASE_URL"), getEnv("SUPABASE_PUBLISHABLE_KEY"), {
     cookies: {
       getAll() {
-        return cookieStore.getAll();
+        return request.cookies.getAll();
       },
-      setAll() {
-        // noop for middleware checks
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          request.cookies.set(name, value);
+          response.cookies.set(name, value, { ...getAuthCookieOptions(), ...options });
+        });
       },
     },
   });
 
   try {
-    const { data, error } = await supabase.auth.getSession();
-    if (error || !data.session) {
-      return null;
-    }
-    return data.session;
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) return null;
+    return data.user;
   } catch {
     return null;
   }
 }
-
-export function getAuthCookieOptions(): CookieOptions {
-  return createSupabaseCookieOptions();
-}
-
-export function getTokenFromRequest(request: Request | NextRequest) {
-  const cookieHeader = request.headers.get("cookie") || "";
-  const match = cookieHeader.match(/(?:^|; )auth_token=([^;]+)/);
-  return match?.[1] ? decodeURIComponent(match[1]) : null;
-}
-
