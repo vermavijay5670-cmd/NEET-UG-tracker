@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+@theme {
+  /* ---- Primary background layers ---- */
+  --color-bg-0: #0a0a0a;
+  --color-bg-1: #111111;
+  --color-bg-2: #171717;
+
+  /* ---- Card surfaces ---- */
+  --color-card-1: #1a1a1a;
+  --color-card-2: #202020;
+  --color-card-3: #262626;
+
+  /* ---- Typography ---- */
+  --color-ink-0: #ffffff;
+  --color-ink-1: #e5e5e5;
+  --color-ink-2: #a3a3a3;
+
+  /* ---- Single-accent-per-card palette ---- */
+  --color-lime: #c7f12d;
+  --color-purple: #7b4dff;
+  --color-cyan: #46ffe8;
+  --color-emerald: #41ff72;
+  --color-gold: #ffd64d;
+
+  /* ---- Liquid Glass palette (Today + Dashboard) ---- */
+  --color-lg-bg1: #0f0b18;
+  --color-lg-bg2: #171224;
+  --color-lg-bg3: #1b1630;
+  --color-lg-1: #a855f7;
+  --color-lg-2: #c084fc;
+  --color-lg-3: #d8b4fe;
+  --color-lg-4: #e879f9;
+  --color-lg-5: #8b5cf6;
+  --color-lg-white: #f6f4ff;
+
+  --font-sans: "Inter", "SF Pro Display", "General Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Courier New", ui-monospace, monospace;
+
+  --radius-card: 28px;
+  --spacing-outer: 48px;
+  --spacing-grid-gap: 24px;
+  --spacing-card-pad: 28px;
+  --spacing-widget: 20px;
+}
+
+html,
+body {
+  background: var(--color-bg-0);
+  color: var(--color-ink-0);
+  font-family: var(--font-sans);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes liquidBreathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    filter: blur(70px);
+  }
+  50% {
+    opacity: 0.85;
+    filter: blur(90px);
+  }
+}
+
+@keyframes liquidCardPulse {
+  0%,
+  100% {
+    box-shadow:
+      0 10px 50px var(--glow-a1, rgba(168, 85, 247, 0.18)),
+      0 0 30px var(--glow-a2, rgba(192, 132, 252, 0.2)),
+      inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 10px 56px var(--glow-b1, rgba(168, 85, 247, 0.28)),
+      0 0 42px var(--glow-b2, rgba(192, 132, 252, 0.3)),
+      inset 0 1px 1px rgba(255, 255, 255, 0.36);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liquid-blob,
+  .liquid-card {
+    animation: none !important;
+  }
+}
+
+/* Timer's "running border" — one full loop every 60s while active */
+@property --timer-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes timerBorderSpin {
+  to {
+    --timer-angle: 360deg;
+  }
+}
+
+.timer-border-frame {
+  background: conic-gradient(
+    from var(--timer-angle, 0deg),
+    transparent 0%,
+    transparent 74%,
+    rgba(192, 132, 252, 0.9) 86%,
+    rgba(246, 244, 255, 1) 92%,
+    rgba(192, 132, 252, 0.9) 96%,
+    transparent 100%
+  );
+  animation: timerBorderSpin 60s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timer-border-frame {
+    animation: none !important;
+  }
+}
