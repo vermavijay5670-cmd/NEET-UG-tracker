@@ -128,7 +128,7 @@ export const ACCENT_HEX: Record<Accent, string> = {
 export const QUESTION_PRACTICE_LINKS: Record<Subject, string | null> = {
   phy: null,
   chem: null,
-  bio: "https://question-practice.lovable.app",
+  bio: "https://question-practice.lovable.app/",
 };
 
 // Subtopic breakdowns per chapter — index-aligned with CHAPTERS[subject][cls].
