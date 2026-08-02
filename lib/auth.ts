@@ -10,8 +10,21 @@ export interface AuthUser {
 }
 
 function getEnv(name: string) {
-  const value = process.env[name];
-  return value?.trim() || "";
+  const candidates = [
+    process.env[name],
+    process.env[`NEXT_PUBLIC_${name}`],
+    name === "SUPABASE_PUBLISHABLE_KEY" ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : undefined,
+    name === "SUPABASE_SECRET_KEY" ? process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY : undefined,
+    name === "SUPABASE_URL" ? process.env.NEXT_PUBLIC_SUPABASE_URL : undefined,
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return "";
 }
 
 function createSupabaseCookieOptions(): CookieOptions {

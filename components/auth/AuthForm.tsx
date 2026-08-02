@@ -25,6 +25,7 @@ export function AuthForm({ mode = "login" }: AuthFormProps) {
       const response = await fetch(`/api/auth/${isLogin ? "login" : "signup"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ name, email, password }),
       });
       const data = await response.json();
