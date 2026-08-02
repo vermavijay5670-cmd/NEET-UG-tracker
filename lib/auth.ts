@@ -132,11 +132,15 @@ export async function getSessionFromRequest(request: NextRequest) {
     },
   });
 
-  const { data, error } = await supabase.auth.getSession();
-  if (error) {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session) {
+      return null;
+    }
+    return data.session;
+  } catch {
     return null;
   }
-  return data.session;
 }
 
 export function getAuthCookieOptions(): CookieOptions {

@@ -12,8 +12,12 @@ export async function middleware(request: NextRequest) {
   }
 
   if (protectedPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
-    const session = await getSessionFromRequest(request);
-    if (!session) {
+    try {
+      const session = await getSessionFromRequest(request);
+      if (!session) {
+        return NextResponse.redirect(new URL("/auth", request.url));
+      }
+    } catch {
       return NextResponse.redirect(new URL("/auth", request.url));
     }
   }
