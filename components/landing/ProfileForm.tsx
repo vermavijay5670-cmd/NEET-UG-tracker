@@ -20,11 +20,23 @@ export function ProfileForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated]);
 
-  function handleSubmit(e: React.FormEvent) {
+    function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setProfile(name, exam || "NEET UG");
+    const cleanName = name.trim();
+    const cleanExam = (exam || "NEET UG").trim();
+    setProfile(cleanName, cleanExam);
+    // write through immediately — the 200ms debounce can lose the save on navigation
+    try {
+      const raw = window.localStorage.getItem("neet_tracker_v1");
+      const parsed = raw ? JSON.parse(raw) : {};
+      window.localStorage.setItem(
+        "neet_tracker_v1",
+        JSON.stringify({ ...parsed, studentName: cleanName, targetExam: cleanExam })
+      );
+    } catch {}
     router.push("/today");
   }
+
 
   return (
     <section id="profile-form" className="mx-auto max-w-[1120px] px-4 py-16 sm:px-6 sm:py-24">

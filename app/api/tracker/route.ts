@@ -20,24 +20,24 @@ type TrackerPayload = {
 };
 
 function toTrackerPayload(body: TrackerPayload | null | undefined) {
-  return {
-    start_date: body?.startDate ?? "",
-    exam_date: body?.examDate ?? "",
-    daily_goal_hours: body?.dailyGoalHours ?? 6,
-    student_name: body?.studentName ?? "",
-    target_exam: body?.targetExam ?? "",
-    log: body?.log ?? {},
-    planner: body?.planner ?? {},
-    subtopics: body?.subtopics ?? {},
-    stopwatch_running_since: body?.stopwatchRunningSince ?? null,
-    stopwatch_last_flush_at: body?.stopwatchLastFlushAt ?? null,
-    stopwatch_sessions: body?.stopwatchSessions ?? 0,
-    timer_duration_ms: body?.timerDurationMs ?? 25 * 60_000,
-    timer_remaining_ms: body?.timerRemainingMs ?? 25 * 60_000,
-    timer_end_at: body?.timerEndAt ?? null,
-  };
+  const out: Record<string, unknown> = {};
+  const set = (k: string, v: unknown) => { if (v !== undefined) out[k] = v; };
+  set("start_date", body?.startDate);
+  set("exam_date", body?.examDate);
+  set("daily_goal_hours", body?.dailyGoalHours);
+  set("student_name", body?.studentName);
+  set("target_exam", body?.targetExam);
+  set("log", body?.log);
+  set("planner", body?.planner);
+  set("subtopics", body?.subtopics);
+  set("stopwatch_running_since", body?.stopwatchRunningSince ?? null);
+  set("stopwatch_last_flush_at", body?.stopwatchLastFlushAt ?? null);
+  set("stopwatch_sessions", body?.stopwatchSessions);
+  set("timer_duration_ms", body?.timerDurationMs);
+  set("timer_remaining_ms", body?.timerRemainingMs);
+  set("timer_end_at", body?.timerEndAt ?? null);
+  return out;
 }
-
 async function getSupabaseServerClient() {
   const cookieStore = await cookies();
 
